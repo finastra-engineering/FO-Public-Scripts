@@ -166,12 +166,22 @@ function script_init() {
     local oc_url="https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-${oc_version}/openshift-client-linux.tar.gz"
 
     curl -s -L "${oc_url}" --output openshift-client-linux.tar.gz
-
-    sleep 10000
+    tar xzvf openshift-client-linux.tar.gz >/dev/null 2>&1
 
     # Download and extract Azure az tool
     yum install -y python3 >/dev/null 2>&1
-    curl -s -L "https://aka.ms/InstallAzureCli" | bash
+    rpm --import https://packages.microsoft.com/keys/microsoft.asc
+    cat << EOF > /etc/yum.repos.d/azure-cli.repo
+[azure-cli]
+name=Azure CLI
+baseurl=https://packages.microsoft.com/yumrepos/azure-cli
+enabled=1
+gpgcheck=1
+gpgkey=https://packages.microsoft.com/keys/microsoft.asc
+EOF
+    yum install -y azure-cli >/dev/null 2>&1
+
+    sleep 10000
 
 
     # Set tools vars
