@@ -168,6 +168,7 @@ function script_init() {
     curl -s -L "${oc_url}" --output openshift-client-linux.tar.gz
 
     # Download and extract Azure az tool
+    yum install -y python3 >/dev/null 2>&1
     curl -s -L "https://aka.ms/InstallAzureCli" | bash
 
     sleep 10000
