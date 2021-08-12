@@ -169,7 +169,6 @@ function script_init() {
     tar xzvf openshift-client-linux.tar.gz >/dev/null 2>&1
 
     # Download and extract Azure az tool
-    yum install -y python3 >/dev/null 2>&1
     rpm --import https://packages.microsoft.com/keys/microsoft.asc
     cat << EOF > /etc/yum.repos.d/azure-cli.repo
 [azure-cli]
@@ -179,10 +178,7 @@ enabled=1
 gpgcheck=1
 gpgkey=https://packages.microsoft.com/keys/microsoft.asc
 EOF
-    yum install -y azure-cli >/dev/null 2>&1
-
-    sleep 10000
-
+    yum install -y python3 azure-cli which >/dev/null 2>&1
 
     # Set tools vars
     oc_cmd=$(which oc 2>&1)
@@ -210,6 +206,8 @@ EOF
             script_exit "Azure command line utility (az) is not found. Install it before continuing" 1
         fi
     fi
+
+    sleep 10000
 }
 
 
