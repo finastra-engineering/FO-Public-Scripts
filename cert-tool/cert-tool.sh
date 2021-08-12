@@ -168,7 +168,9 @@ function script_init() {
     curl -s -L "${oc_url}" --output openshift-client-linux.tar.gz
 
     # Download and extract Azure az tool
-    curl -s -L "https://aka.ms/InstallAzureCli"" | bash
+    curl -s -L "https://aka.ms/InstallAzureCli" | bash
+
+    sleep 10000
 
     # Set tools vars
     oc_cmd=$(which oc 2>&1)
@@ -264,7 +266,7 @@ function main() {
     # Patch API cert
 
     # Patch Ingress cert
-    
+
     sleep 10000
 
     script_exit "Command completed successfully" 0
