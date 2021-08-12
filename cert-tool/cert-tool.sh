@@ -254,6 +254,8 @@ function main() {
     # Patch API cert
 
     # Patch Ingress cert
+    
+    sleep 10000
 
     script_exit "Command completed successfully" 0
 }
