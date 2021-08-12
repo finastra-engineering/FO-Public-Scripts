@@ -181,7 +181,6 @@ EOF
     yum install -y python3 azure-cli which
 
     # Set tools vars
-echo "OC check"
     oc_cmd=$(which oc 2>&1)
     if [[ $? -ne 0 ]]; then
         if [[ -x "/usr/bin/oc" ]]; then
@@ -195,7 +194,6 @@ echo "OC check"
         fi
     fi
 
-echo "AZ check"
     az_cmd=$(which az 2>&1)
     if [[ $? -ne 0 ]]; then
         if [[ -x "/usr/bin/az" ]]; then
@@ -209,7 +207,6 @@ echo "AZ check"
         fi
     fi
 
-    sleep 10000
 }
 
 
@@ -261,7 +258,7 @@ function ocp_login() {
 # ARGS: $@ (optional): Arguments provided to the script
 # OUTS: None
 function main() {
-    trap script_trap_err ERR
+#    trap script_trap_err ERR
     trap script_trap_exit EXIT
 
     script_init "$@"
