@@ -178,9 +178,10 @@ enabled=1
 gpgcheck=1
 gpgkey=https://packages.microsoft.com/keys/microsoft.asc
 EOF
-    yum install -y python3 azure-cli which >/dev/null 2>&1
+    yum install -y python3 azure-cli which
 
     # Set tools vars
+echo "OC check"
     oc_cmd=$(which oc 2>&1)
     if [[ $? -ne 0 ]]; then
         if [[ -x "/usr/bin/oc" ]]; then
@@ -194,6 +195,7 @@ EOF
         fi
     fi
 
+echo "AZ check"
     az_cmd=$(which az 2>&1)
     if [[ $? -ne 0 ]]; then
         if [[ -x "/usr/bin/az" ]]; then
