@@ -64,6 +64,8 @@ function script_exit() {
     #Clean up logic
     #Clean up records in /etc/hosts - just in case this script is used anywhere else from Azure container instance
 
+    cd "${orig_cwd:-/}"
+
     if [[ $# -ne 0 ]]; then
         printf '%s\n' "$1"
         exit "${2:-0}"
@@ -118,6 +120,8 @@ Usage:
 
         AZ_* - TBD: Azure connectivity parameters
         AZ_* - TBD: Keyvault parameters
+
+        OCP_VERSION - OCP cli version to use (4.7 is default)
 EOF
 }
 
@@ -128,6 +132,8 @@ function script_init() {
     readonly script_dir="$(dirname "$script_path")"
     readonly script_name="$(basename "$script_path")"
     readonly script_params="$*"
+
+    cd $HOME
 
     # Load arguments from environment variables
     if [[ -z ${ARO_API_ADDRESS} ]]; then
@@ -155,10 +161,14 @@ function script_init() {
         script_exit "ARO_PASSWORD is not provided" 1
     fi
 
-
     # Download and extract OCP oc cli tool
+    local oc_version="${OCP_VERSION:-4.7}"
+    local oc_url="https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-${oc_version}/openshift-client-linux.tar.gz"
+
+    curl -s -L "${oc_url}" --output openshift-client-linux.tar.gz
 
     # Download and extract Azure az tool
+    curl -s -L "https://aka.ms/InstallAzureCli"" | bash
 
     # Set tools vars
     oc_cmd=$(which oc 2>&1)
@@ -167,8 +177,8 @@ function script_init() {
             oc_cmd="/usr/bin/oc"
         elif [[ -x "/usr/local/bin/oc" ]]; then
             oc_cmd="/usr/local/bin/oc"
-        elif [[ -x "${orig_cwd}/oc" ]]; then
-            oc_cmd="${orig_cwd}/oc"
+        elif [[ -x "./oc" ]]; then
+            oc_cmd="./oc"
         else
             script_exit "OCP command line utility (oc) is not found. Install it before continuing" 1
         fi
@@ -178,10 +188,10 @@ function script_init() {
     if [[ $? -ne 0 ]]; then
         if [[ -x "/usr/bin/az" ]]; then
             az_cmd="/usr/bin/az"
-        elif [[ -x "/usr/lazal/bin/az" ]]; then
-            az_cmd="/usr/lazal/bin/az"
-        elif [[ -x "${orig_cwd}/az" ]]; then
-            az_cmd="${orig_cwd}/az"
+        elif [[ -x "/usr/local/bin/az" ]]; then
+            az_cmd="/usr/local/bin/az"
+        elif [[ -x "./az" ]]; then
+            az_cmd="./az"
         else
             script_exit "Azure command line utility (az) is not found. Install it before continuing" 1
         fi
