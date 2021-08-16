@@ -155,6 +155,11 @@ function script_init() {
         FORCE=false
     fi
 
+    #Local file names
+    readonly caroot_filename=${HOME}/caroot.pem
+    readonly cert_filename=${HOME}/cert.pem
+    readonly key_filename=${HOME}/key.pem
+
     # Load arguments from environment variables
     if [[ -z ${ARO_API_IP} ]]; then
         script_usage
@@ -275,7 +280,7 @@ function parse_params() {
 # OUTS: None if successful, Error text otherwise
 function ocp_login() {
 
-    ${oc_cmd} login --username=$2 --password=$3 --server=$1
+    ${oc_cmd} login --server=${1} --username=${2} --password=${3}
 
 }
 
@@ -287,7 +292,7 @@ function ocp_login() {
 # OUTS: None if successful, Error text otherwise
 function az_login() {
 
-    ${az_cmd} login --allow-no-subscriptions --service-principal --username=$1 --password=$2 --tenant=$3
+    ${az_cmd} login --allow-no-subscriptions --service-principal --username=${1} --password=${2} --tenant=${3}
 
 }
 
@@ -295,19 +300,74 @@ function az_login() {
 # ARGS: $1 - config map name
 # $2 - CA certificate file name
 # OUTS: None if successful, Error text otherwise
-function ocp_login() {
+function patch_root_ca() {
     local c_output=""
     local replace="${FORCE:-false}"
 
-    c_output=$(${oc_cmd} get proxy/cluster -o jsonpath='{.spec.trustedCA.name}' 2>&1)
-    if [[ -z ${c_output} || ${c_output} != ${OCP_SECRET} ]]; then
+    # Check if already present
+    c_output=$(${oc_cmd} get proxy/cluster -o jsonpath='{.spec.trustedCA.name}')
+    if [[ -z ${c_output} || ${c_output} != ${1} ]]; then
+        replace=true
+    fi
+
+    # Replace
+    if [[ ${replace} != true ]]; then
+        script_output "Root CA already present in proxy/cluster - skipping. Use FORCE=true environment variable to override"
+    else
+        ${oc_cmd} create configmap ${1} --from-file=ca-bundle.crt=${2} -n openshift-config
+        ${oc_cmd} patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"'${1}'"}}}'
+    fi
+}
+
+
+# DESC: Patch ingress controller certificate
+# ARGS: $1 - secret name
+# $2 - certificate file name
+# $3 - private key file name
+# OUTS: None if successful, Error text otherwise
+function patch_ingress_cert() {
+    local c_output=""
+    local replace="${FORCE:-false}"
+
+    # Check if already present
+    c_output=$(${oc_cmd} get ingresscontroller.operator default -n openshift-ingress-operator -o jsonpath='{.spec.defaultCertificate.name}')
+    if [[ -z ${c_output} || ${c_output} != ${1} ]]; then
         replace=true
     fi
 
     if [[ ${replace} != true ]]; then
-        script_output "Root CA already present in proxy/cluster - skipping. Use FORCE=true environment variable to override"
+        script_output "Certificate already present in ingress controller - skipping. Use FORCE=true environment variable to override"
+    else
+        ${oc_cmd} create secret tls ${1} --cert=${2} --key=${3} -n openshift-ingress
+        ${oc_cmd} patch ingresscontroller.operator default --type=merge --patch='{"spec":{"defaultCertificate":{"name":"'${1}'"}}}' -n openshift-ingress-operator
     fi
 }
+
+
+# DESC: Patch API server certificate
+# ARGS: $1 - secret name
+# $2 - certificate file name
+# $3 - private key file name
+# $4 - Api FQDN
+# OUTS: None if successful, Error text otherwise
+function patch_api_cert() {
+    local c_output=""
+    local replace="${FORCE:-false}"
+
+    # Check if already present
+    c_output=$(${oc_cmd} get apiserver cluster -o jsonpath='{.spec.servingCerts.namedCertificates[?(@.names[0]=="${4}")].servingCertificate.name}')
+    if [[ -z ${c_output} || ${c_output} != ${1} ]]; then
+        replace=true
+    fi
+
+    if [[ ${replace} != true ]]; then
+        script_output "Certificate already present in API Server - skipping. Use FORCE=true environment variable to override"
+    else
+        ${oc_cmd} create secret tls ${1} --cert=${2} --key=${3} -n openshift-config
+        ${oc_cmd} patch apiserver cluster --type=merge --patch='{"spec":{"servingCerts": {"namedCertificates":[{"names": ["'${4}'"],"servingCertificate": {"name": "'${1}'"}}]}}}'
+    fi
+}
+
 
 # DESC: Main control flow
 # ARGS: $@ (optional): Arguments provided to the script
@@ -332,14 +392,17 @@ function main() {
 
     # Patch Root CA cert
     script_output "Attempting to patch Root CA"
+    patch_root_ca "${OCP_SECRET}" "${caroot_filename}"
 
     STATE=1
-    # Patch API cert
-    script_output "Attempting to replace API server certificate"
-
-    STATE=2
     # Patch Ingress cert
     script_output "Attempting to replace iingress certificate"
+    patch_ingress_cert "${OCP_SECRET}" "${cert_filename}" "${key_filename}"
+
+    STATE=2
+    # Patch API cert
+    script_output "Attempting to replace API server certificate"
+    patch_api_cert "${OCP_SECRET}" "${cert_filename}" "${key_filename}" ${ARO_API_URL}
 
     STATE=3
     sleep 10000
