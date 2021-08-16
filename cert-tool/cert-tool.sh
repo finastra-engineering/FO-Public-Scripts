@@ -17,10 +17,10 @@
 #
 # The following parameters should be provided to the script via environment variables:
 #
-# ARO_API_ADDRESS
-# ARO_API_HOSTNAME
-# ARO_APPS_ADDRESS
-# ARO_APPS_HOSTNAME
+# ARO_API_IP
+# ARO_API_URL
+# ARO_INGRESS_IP
+# ARO_INGRESS_URL
 # ARO_USERNAME
 # ARO_PASSWORD
 #
@@ -45,7 +45,7 @@ set -o errtrace         # Ensure the error trap handler is inherited
 # ARGS: $1 - Text for output
 # OUTS: None
 script_output () {
-    echo "$1"
+    printf '%s\n' "$1"
 }
 
 
@@ -67,6 +67,9 @@ function script_exit() {
     cd "${orig_cwd:-/}"
 
     if [[ $# -ne 0 ]]; then
+        if [[ ${2} -ne 0 ]]; then
+            printf 'ERROR: '
+        fi
         printf '%s\n' "$1"
         exit "${2:-0}"
     fi
@@ -111,17 +114,20 @@ script_usage () {
 Usage:
     -h|--help		Displays this help
     *               All parameters should be passed via environment variables
-        ARO_API_ADDRESS
-        ARO_API_HOSTNAME
-        ARO_APPS_ADDRESS
-        ARO_APPS_HOSTNAME
-        ARO_USERNAME
-        ARO_PASSWORD
+        ARO_API_IP       - ARO API IP Address
+        ARO_API_URL      - ARO API URL
+        ARO_INGRESS_IP   - ARO Ingress IP Address
+        ARO_INGRESS_URL  - ARO Ingress Name (Optional - ARO_API_URL can be used to construct it)
+        ARO_USERNAME     - ARO Cluster Admin User Name
+        ARO_PASSWORD     - ARO Cluster Admin User Password
 
-        AZ_* - TBD: Azure connectivity parameters
-        AZ_* - TBD: Keyvault parameters
+        AZ_CLIENT_ID     - Client ID to be used to access Azure API via CLI
+        AZ_CLIENT_SECRET - Client ID secret
+        AZ_TENANT_ID     - Tenant ID to be used to access Azure API via CLI
+        AZ_VAULT_NAME    - Name of the Azure Vault storing certificate
+        AZ_CERT_NAME     - Name of the Certificate in the Vault
 
-        OCP_VERSION - OCP cli version to use (4.7 is default)
+        OCP_VERSION      - OCP cli version to use (Optional - 4.7 is default)
 EOF
 }
 
@@ -136,21 +142,22 @@ function script_init() {
     cd $HOME
 
     # Load arguments from environment variables
-    if [[ -z ${ARO_API_ADDRESS} ]]; then
+    if [[ -z ${ARO_API_IP} ]]; then
         script_usage
-        script_exit "ARO_API_ADDRESS is not provided" 1
+        script_exit "ARO_API_IP is not provided" 1
     fi
-    if [[ -z ${ARO_API_HOSTNAME} ]]; then
+    if [[ -z ${ARO_API_URL} ]]; then
         script_usage
-        script_exit "ARO_API_HOSTNAME is not provided" 1
+        script_exit "ARO_API_URL is not provided" 1
     fi
-    if [[ -z ${ARO_APPS_ADDRESS} ]]; then
+    if [[ -z ${ARO_INGRESS_IP} ]]; then
         script_usage
-        script_exit "ARO_APPS_ADDRESS is not provided" 1
+        script_exit "ARO_INGRESS_IP is not provided" 1
     fi
-    if [[ -z ${ARO_APPS_HOSTNAME} ]]; then
-        script_usage
-        script_exit "ARO_APPS_HOSTNAME is not provided" 1
+    if [[ -z ${ARO_INGRESS_URL} ]]; then
+        script_output "ARO_INGRESS_URL is not provided - will try to create one from ARO_API_URL: ${ARO_API_URL}"
+        ARO_INGRESS_URL="apps.${ARO_API_URL#*.}"
+        script_output "ARO_INGRESS_URL= ${ARO_INGRESS_URL}"
     fi
     if [[ -z ${ARO_USERNAME} ]]; then
         script_usage
@@ -160,13 +167,33 @@ function script_init() {
         script_usage
         script_exit "ARO_PASSWORD is not provided" 1
     fi
+    if [[ -z ${AZ_CLIENT_ID} ]]; then
+        script_usage
+        script_exit "AZ_CLIENT_ID is not provided" 1
+    fi
+    if [[ -z ${AZ_CLIENT_SECRET} ]]; then
+        script_usage
+        script_exit "AZ_CLIENT_SECRET is not provided" 1
+    fi
+    if [[ -z ${AZ_TENANT_ID} ]]; then
+        script_usage
+        script_exit "AZ_TENANT_ID is not provided" 1
+    fi
+    if [[ -z ${AZ_VAULT_NAME} ]]; then
+        script_usage
+        script_exit "AZ_VAULT_NAME is not provided" 1
+    fi
+    if [[ -z ${AZ_CERT_NAME} ]]; then
+        script_usage
+        script_exit "AZ_CERT_NAME is not provided" 1
+    fi
 
     # Download and extract OCP oc cli tool
     local oc_version="${OCP_VERSION:-4.7}"
     local oc_url="https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-${oc_version}/openshift-client-linux.tar.gz"
 
     curl -s -L "${oc_url}" --output openshift-client-linux.tar.gz
-    tar xzvf openshift-client-linux.tar.gz >/dev/null 2>&1
+    tar xzvf openshift-client-linux.tar.gz
 
     # Download and extract Azure az tool
     rpm --import https://packages.microsoft.com/keys/microsoft.asc
@@ -181,30 +208,24 @@ EOF
     yum install -y python3 azure-cli which
 
     # Set tools vars
-    oc_cmd=$(which oc 2>&1)
-    if [[ $? -ne 0 ]]; then
-        if [[ -x "/usr/bin/oc" ]]; then
-            oc_cmd="/usr/bin/oc"
-        elif [[ -x "/usr/local/bin/oc" ]]; then
-            oc_cmd="/usr/local/bin/oc"
-        elif [[ -x "./oc" ]]; then
-            oc_cmd="./oc"
-        else
-            script_exit "OCP command line utility (oc) is not found. Install it before continuing" 1
-        fi
+    if [[ -x "/usr/bin/oc" ]]; then
+        oc_cmd="/usr/bin/oc"
+    elif [[ -x "/usr/local/bin/oc" ]]; then
+        oc_cmd="/usr/local/bin/oc"
+    elif [[ -x "./oc" ]]; then
+        oc_cmd="./oc"
+    else
+        oc_cmd=$(which oc)
     fi
 
-    az_cmd=$(which az 2>&1)
-    if [[ $? -ne 0 ]]; then
-        if [[ -x "/usr/bin/az" ]]; then
-            az_cmd="/usr/bin/az"
-        elif [[ -x "/usr/local/bin/az" ]]; then
-            az_cmd="/usr/local/bin/az"
-        elif [[ -x "./az" ]]; then
-            az_cmd="./az"
-        else
-            script_exit "Azure command line utility (az) is not found. Install it before continuing" 1
-        fi
+    if [[ -x "/usr/bin/az" ]]; then
+        az_cmd="/usr/bin/az"
+    elif [[ -x "/usr/local/bin/az" ]]; then
+        az_cmd="/usr/local/bin/az"
+    elif [[ -x "./az" ]]; then
+        az_cmd="./az"
+    else
+        az_cmd=$(which az)
     fi
 
 }
@@ -224,7 +245,8 @@ function parse_params() {
                 script_exit ""
                 ;;
             *)
-                script_exit "Invalid parameter was provided: $param" 1
+                script_usage
+                script_exit "Command line parameters will be ignored - all data should be passed via environment variables" 2
                 ;;
         esac
     done
@@ -258,11 +280,11 @@ function ocp_login() {
 # ARGS: $@ (optional): Arguments provided to the script
 # OUTS: None
 function main() {
-#    trap script_trap_err ERR
+    trap script_trap_err ERR
     trap script_trap_exit EXIT
 
-    script_init "$@"
     parse_params "$@"
+    script_init "$@"
 
     # Log in to ARO Cluster
 
