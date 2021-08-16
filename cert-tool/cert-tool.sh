@@ -128,6 +128,7 @@ Usage:
         AZ_CERT_NAME     - Name of the Certificate in the Vault
 
         OCP_VERSION      - OCP cli version to use (Optional - 4.7 is default)
+        FORCE            - Overwrite certs if already present (optional)
 EOF
 }
 
@@ -140,6 +141,12 @@ function script_init() {
     readonly script_params="$*"
 
     cd $HOME
+
+    # Secret name - to be used to determine if certificates already loaded
+    OCP_SECRET="ca_certs"
+    if [[ ${FORCE} =~ ^1|yes|true$ ]]; then
+        FORCE=true
+    fi
 
     # Load arguments from environment variables
     if [[ -z ${ARO_API_IP} ]]; then
@@ -205,7 +212,7 @@ enabled=1
 gpgcheck=1
 gpgkey=https://packages.microsoft.com/keys/microsoft.asc
 EOF
-    yum install -y python3 azure-cli which
+    yum install -y python3 azure-cli which openssl
 
     # Set tools vars
     if [[ -x "/usr/bin/oc" ]]; then
@@ -228,6 +235,7 @@ EOF
         az_cmd=$(which az)
     fi
 
+    # host name overrides - TBD
 }
 
 
@@ -255,24 +263,39 @@ function parse_params() {
 
 # DESC: OCP Login
 # ARGS: $1 - Cluster API endpoint
-# $2 - Login token or username
-# $3 - Should not be provided if second parameter is token, otherwise - password
+# $2 - Login username
+# $3 - Login password
 # OUTS: None if successful, Error text otherwise
 # EXIT: 0 - success, 1 - error
 function ocp_login() {
     local c_output=""
     local c_result=0
 
-    if [[ -z $3 ]]; then
-        c_output=$(${oc_cmd} login --token=$2 --server=$1 2>&1)
-    else
-        c_output=$(${oc_cmd} login --username=$2 --password=$3 --server=$1 2>&1)
-    fi
+    c_output=$(${oc_cmd} login --username=$2 --password=$3 --server=$1 2>&1)
     c_result=$?
     if [[ ${c_result} -ne 0 ]]; then
-        echo "Attempt to login to OCP Cluster failed: ${c_output}"
+        script_exit "Attempt to login to OCP Cluster failed: ${c_output}" 2
     fi
-    exit ${c_result}
+    exit 0
+}
+
+
+# DESC: Azure Login
+# ARGS: $1 - Client ID
+# $2 - Client Secret
+# $3 - Tenant ID
+# OUTS: None if successful, Error text otherwise
+# EXIT: 0 - success, 1 - error
+function az_login() {
+    local c_output=""
+    local c_result=0
+
+    c_output=$(${az_cmd} login --allow-no-subscriptions --service-principal --username=$1 --password=$2 --tenant=$3 2>&1)
+    c_result=$?
+    if [[ ${c_result} -ne 0 ]]; then
+        script_exit "Attempt to login to Azure failed: ${c_output}" 2
+    fi
+    exit 0
 }
 
 
@@ -287,8 +310,10 @@ function main() {
     script_init "$@"
 
     # Log in to ARO Cluster
+    ocp_login "${ARO_API_URL}:6443" "${ARO_USERNAME}" "${ARO_PASSWORD}"
 
     # Log in to Azure
+    az_login "${AZ_CLIENT_ID}" "${AZ_CLIENT_SECRET}" "${AZ_TENANT_ID}"
 
     # Retrieve certificates from the Keyvault
 
