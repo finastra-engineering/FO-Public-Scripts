@@ -24,8 +24,8 @@
 # ARO_USERNAME
 # ARO_PASSWORD
 #
-# AZ_* - TBD: Azure connectivity parameters
-# AZ_* - TBD: Keyvault parameters
+# KEY_PEM   - acme_certificate.cluster_cert.private_key_pem
+# CERT_PEM  - acme_certificate.cluster_cert.certificate_pem
 
 # v0.1 Yerzhan Beisembayev ybeisemb@redhat.com Yerzhan.Beisembayev@dh.com
 
@@ -126,11 +126,8 @@ Usage:
         ARO_USERNAME     - ARO Cluster Admin User Name
         ARO_PASSWORD     - ARO Cluster Admin User Password
 
-        AZ_CLIENT_ID     - Client ID to be used to access Azure API via CLI
-        AZ_CLIENT_SECRET - Client ID secret
-        AZ_TENANT_ID     - Tenant ID to be used to access Azure API via CLI
-        AZ_VAULT_NAME    - Name of the Azure Vault storing certificate
-        AZ_CERT_NAME     - Name of the Certificate in the Vault
+        CERT_PEM         - Certificate content in PEM format
+        KEY_PEM          - Key content in PEM format
 
         OCP_VERSION      - OCP cli version to use (Optional - 4.7 is default)
         FORCE            - Overwrite certs if already present (optional)
@@ -186,25 +183,13 @@ function script_init() {
         script_usage
         script_exit "ARO_PASSWORD is not provided" 1
     fi
-    if [[ -z ${AZ_CLIENT_ID} ]]; then
+    if [[ -z ${KEY_PEM} ]]; then
         script_usage
-        script_exit "AZ_CLIENT_ID is not provided" 1
+        script_exit "KEY_PEM is not provided" 1
     fi
-    if [[ -z ${AZ_CLIENT_SECRET} ]]; then
+    if [[ -z ${CERT_PEM} ]]; then
         script_usage
-        script_exit "AZ_CLIENT_SECRET is not provided" 1
-    fi
-    if [[ -z ${AZ_TENANT_ID} ]]; then
-        script_usage
-        script_exit "AZ_TENANT_ID is not provided" 1
-    fi
-    if [[ -z ${AZ_VAULT_NAME} ]]; then
-        script_usage
-        script_exit "AZ_VAULT_NAME is not provided" 1
-    fi
-    if [[ -z ${AZ_CERT_NAME} ]]; then
-        script_usage
-        script_exit "AZ_CERT_NAME is not provided" 1
+        script_exit "CERT_PEM is not provided" 1
     fi
 
     # Download and extract OCP oc cli tool
@@ -245,6 +230,16 @@ yum install -y python3 azure-cli which openssl
         az_cmd="./az"
     else
         az_cmd=$(which az)
+    fi
+
+    if [[ -x "/usr/bin/openssl" ]]; then
+        openssl_cmd="/usr/bin/openssl"
+    elif [[ -x "/usr/local/bin/openssl" ]]; then
+        openssl_cmd="/usr/local/bin/openssl"
+    elif [[ -x "./openssl" ]]; then
+        openssl_cmd="./openssl"
+    else
+        openssl_cmd=$(which openssl)
     fi
 
     # host name overrides - TBD
@@ -369,6 +364,34 @@ function patch_api_cert() {
 }
 
 
+# DESC: Load certificate and key
+# ARGS: none
+# OUTS: None if successful, Error text otherwise
+function patch_api_cert() {
+
+    # Load key and cert from environment variables - fix new lines in process
+    echo ${KEY_PEM} | sed 's/\\n/\n/g' > ${key_filename}
+
+    echo ${CERT_PEM} | sed 's/\\n/\n/g' > ${cert_filename}
+
+    # Validate that certificate matches the key
+    c_cert_mod=$(${openssl_cmd} x509 -modulus -noout -in ${cert_filename} | ${openssl_cmd} md5)
+    c_key_mod=$(${openssl_cmd} rsa -modulus -noout -in ${key_filename} | ${openssl_cmd} md5)
+
+    if [[ -z ${c_cert_mod} ]]; then
+        script_exit "Failed to calculate certificate modulus" 2
+    fi
+
+    if [[ -z ${c_key_mod} ]]; then
+        script_exit "Failed to calculate key modulus" 2
+    fi
+
+    if [[ ${c_key_mod} != ${c_cert_mod} ]]; then
+        script_exit "Certificate and Key does not match" 2
+    fi
+}
+
+
 # DESC: Main control flow
 # ARGS: $@ (optional): Arguments provided to the script
 # OUTS: None
@@ -379,20 +402,21 @@ function main() {
     parse_params "$@"
     script_init "$@"
 
+    # Load certificate and key
+    script_output "Attempting to load certificate and a key"
+    load_certs
+
     # Log in to ARO Cluster
     script_output "Attempting to log in to OCP Cluster"
     ocp_login "${ARO_API_URL}:6443" "${ARO_USERNAME}" "${ARO_PASSWORD}"
 
-    script_output "Attempting to log  in to Azure"
-    # Log in to Azure
-    az_login "${AZ_CLIENT_ID}" "${AZ_CLIENT_SECRET}" "${AZ_TENANT_ID}"
-
-    # Retrieve certificates from the Keyvault
-    script_output "Attempting to retrieve certificates"
+#    script_output "Attempting to log  in to Azure"
+#    # Log in to Azure
+#    az_login "${AZ_CLIENT_ID}" "${AZ_CLIENT_SECRET}" "${AZ_TENANT_ID}"
 
     # Patch Root CA cert
-    script_output "Attempting to patch Root CA"
-    patch_root_ca "${OCP_SECRET}" "${caroot_filename}"
+#    script_output "Attempting to patch Root CA"
+#    patch_root_ca "${OCP_SECRET}" "${caroot_filename}"
 
     STATE=1
     # Patch Ingress cert
