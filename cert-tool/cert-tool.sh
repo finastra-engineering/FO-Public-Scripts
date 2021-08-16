@@ -29,7 +29,8 @@
 
 # v0.1 Yerzhan Beisembayev ybeisemb@redhat.com Yerzhan.Beisembayev@dh.com
 
-
+# track the state of the process to be able to report cluster state if error occur
+STATE=0
 
 # Enable xtrace if the DEBUG environment variable is set
 if [[ ${DEBUG-} =~ ^1|yes|true$ ]]; then
@@ -84,6 +85,10 @@ function script_exit() {
 function script_trap_exit() {
     # Clear exit trap to prevent possible recursion
     trap - EXIT
+
+    if [[ ${STATE} -ne 0 ]]; then
+        echo "WARNING: Operation failed to complete successfully - Cluster can be in a degraded state"
+    fi
 
     script_exit 'Unexpected exit occured!' 2
 }
@@ -146,6 +151,8 @@ function script_init() {
     OCP_SECRET="ca_certs"
     if [[ ${FORCE} =~ ^1|yes|true$ ]]; then
         FORCE=true
+    else
+        FORCE=false
     fi
 
     # Load arguments from environment variables
@@ -212,7 +219,7 @@ enabled=1
 gpgcheck=1
 gpgkey=https://packages.microsoft.com/keys/microsoft.asc
 EOF
-    yum install -y python3 azure-cli which openssl
+yum install -y python3 azure-cli which openssl
 
     # Set tools vars
     if [[ -x "/usr/bin/oc" ]]; then
@@ -266,17 +273,10 @@ function parse_params() {
 # $2 - Login username
 # $3 - Login password
 # OUTS: None if successful, Error text otherwise
-# EXIT: 0 - success, 1 - error
 function ocp_login() {
-    local c_output=""
-    local c_result=0
 
-    c_output=$(${oc_cmd} login --username=$2 --password=$3 --server=$1 2>&1)
-    c_result=$?
-    if [[ ${c_result} -ne 0 ]]; then
-        script_exit "Attempt to login to OCP Cluster failed: ${c_output}" 2
-    fi
-    exit 0
+    ${oc_cmd} login --username=$2 --password=$3 --server=$1
+
 }
 
 
@@ -285,19 +285,29 @@ function ocp_login() {
 # $2 - Client Secret
 # $3 - Tenant ID
 # OUTS: None if successful, Error text otherwise
-# EXIT: 0 - success, 1 - error
 function az_login() {
-    local c_output=""
-    local c_result=0
 
-    c_output=$(${az_cmd} login --allow-no-subscriptions --service-principal --username=$1 --password=$2 --tenant=$3 2>&1)
-    c_result=$?
-    if [[ ${c_result} -ne 0 ]]; then
-        script_exit "Attempt to login to Azure failed: ${c_output}" 2
-    fi
-    exit 0
+    ${az_cmd} login --allow-no-subscriptions --service-principal --username=$1 --password=$2 --tenant=$3
+
 }
 
+# DESC: Patch Root CA in proxy/cluster
+# ARGS: $1 - config map name
+# $2 - CA certificate file name
+# OUTS: None if successful, Error text otherwise
+function ocp_login() {
+    local c_output=""
+    local replace="${FORCE:-false}"
+
+    c_output=$(${oc_cmd} get proxy/cluster -o jsonpath='{.spec.trustedCA.name}' 2>&1)
+    if [[ -z ${c_output} || ${c_output} != ${OCP_SECRET} ]]; then
+        replace=true
+    fi
+
+    if [[ ${replace} != true ]]; then
+        script_output "Root CA already present in proxy/cluster - skipping. Use FORCE=true environment variable to override"
+    fi
+}
 
 # DESC: Main control flow
 # ARGS: $@ (optional): Arguments provided to the script
@@ -310,19 +320,28 @@ function main() {
     script_init "$@"
 
     # Log in to ARO Cluster
+    script_output "Attempting to log in to OCP Cluster"
     ocp_login "${ARO_API_URL}:6443" "${ARO_USERNAME}" "${ARO_PASSWORD}"
 
+    script_output "Attempting to log  in to Azure"
     # Log in to Azure
     az_login "${AZ_CLIENT_ID}" "${AZ_CLIENT_SECRET}" "${AZ_TENANT_ID}"
 
     # Retrieve certificates from the Keyvault
+    script_output "Attempting to retrieve certificates"
 
     # Patch Root CA cert
+    script_output "Attempting to patch Root CA"
 
+    STATE=1
     # Patch API cert
+    script_output "Attempting to replace API server certificate"
 
+    STATE=2
     # Patch Ingress cert
+    script_output "Attempting to replace iingress certificate"
 
+    STATE=3
     sleep 10000
 
     script_exit "Command completed successfully" 0
