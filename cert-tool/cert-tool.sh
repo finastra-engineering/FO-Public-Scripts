@@ -145,7 +145,7 @@ function script_init() {
     cd $HOME
 
     # Secret name - to be used to determine if certificates already loaded
-    OCP_SECRET="ca_certs"
+    OCP_SECRET="tf-certs"
     if [[ ${FORCE} =~ ^1|yes|true$ ]]; then
         FORCE=true
     else
@@ -275,7 +275,7 @@ function parse_params() {
 # OUTS: None if successful, Error text otherwise
 function ocp_login() {
 
-    ${oc_cmd} login --server=${1} --username=${2} --password=${3}
+    ${oc_cmd} login --insecure-skip-tls-verify --server=${1} --username=${2} --password=${3}
 
 }
 
@@ -367,7 +367,7 @@ function patch_api_cert() {
 # DESC: Load certificate and key
 # ARGS: none
 # OUTS: None if successful, Error text otherwise
-function patch_api_cert() {
+function load_certs() {
 
     # Load key and cert from environment variables - fix new lines in process
     echo ${KEY_PEM} | sed 's/\\n/\n/g' > ${key_filename}
