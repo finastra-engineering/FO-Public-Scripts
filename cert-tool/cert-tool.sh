@@ -243,6 +243,8 @@ yum install -y python3 azure-cli which openssl
     fi
 
     # host name overrides - TBD
+    echo "${ARO_API_IP} ${ARO_API_URL}" >> /etc/hosts
+    echo "${ARO_INGRESS_IP} ${ARO_INGRESS_URL}" >> /etc/hosts
 }
 
 
@@ -275,7 +277,7 @@ function parse_params() {
 # OUTS: None if successful, Error text otherwise
 function ocp_login() {
 
-    ${oc_cmd} login --insecure-skip-tls-verify --server="${1}" --username="${2}" --password="${3}"
+    ${oc_cmd} login --insecure-skip-tls-verify --server="${1}:6443" --username="${2}" --password="${3}"
 
 }
 
