@@ -277,7 +277,7 @@ function parse_params() {
 # OUTS: None if successful, Error text otherwise
 function ocp_login() {
 
-    ${oc_cmd} login --insecure-skip-tls-verify --server="${1}:6443" --username="${2}" --password="${3}"
+    ${oc_cmd} login --insecure-skip-tls-verify --server="${1}" --username="${2}" --password="${3}"
 
 }
 
