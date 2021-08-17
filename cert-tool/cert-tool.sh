@@ -46,7 +46,7 @@ set -o errtrace         # Ensure the error trap handler is inherited
 # ARGS: $1 - Text for output
 # OUTS: None
 script_output () {
-    printf '%s\n' "$1"
+    printf '%s\n' "$1" 1>&2
 }
 
 
