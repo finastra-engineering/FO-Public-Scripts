@@ -145,7 +145,7 @@ function script_init() {
     cd "$HOME" || cd
 
     # Secret name - to be used to determine if certificates already loaded
-    OCP_SECRET="tf-certs"
+    OCP_SECRET="tf-certs-$(date +%s)"
     if [[ ${FORCE} =~ ^1|yes|true$ ]]; then
         FORCE=true
     else
@@ -303,7 +303,8 @@ function patch_root_ca() {
 
     # Check if already present
     c_output=$(${oc_cmd} get proxy/cluster -o jsonpath='{.spec.trustedCA.name}')
-    if [[ -z ${c_output} || ${c_output} != "${1}" ]]; then
+#    if [[ -z ${c_output} || ${c_output} != "${1}" ]]; then
+    if [[ -z ${c_output} ]]; then
         replace=true
     fi
 
@@ -328,7 +329,8 @@ function patch_ingress_cert() {
 
     # Check if already present
     c_output=$(${oc_cmd} get ingresscontroller.operator default -n openshift-ingress-operator -o jsonpath='{.spec.defaultCertificate.name}')
-    if [[ -z ${c_output} || ${c_output} != "${1}" ]]; then
+#    if [[ -z ${c_output} || ${c_output} != "${1}" ]]; then
+    if [[ -z ${c_output} ]]; then
         replace=true
     fi
 
@@ -353,7 +355,8 @@ function patch_api_cert() {
 
     # Check if already present
     c_output=$(${oc_cmd} get apiserver cluster -o jsonpath='{.spec.servingCerts.namedCertificates[?(@.names[0]=="'"${4}"'")].servingCertificate.name}')
-    if [[ -z ${c_output} || ${c_output} != "${1}" ]]; then
+#    if [[ -z ${c_output} || ${c_output} != "${1}" ]]; then
+    if [[ -z ${c_output} ]]; then
         replace=true
     fi
 
