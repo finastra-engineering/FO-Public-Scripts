@@ -65,7 +65,7 @@ function script_exit() {
     #Clean up logic
     #Clean up records in /etc/hosts - just in case this script is used anywhere else from Azure container instance
 
-    cd "${orig_cwd:-/}"
+    cd "${orig_cwd:-/}"  || cd
 
     if [[ $# -ne 0 ]]; then
         if [[ ${2} -ne 0 ]]; then
@@ -142,7 +142,7 @@ function script_init() {
     readonly script_name="$(basename "$script_path")"
     readonly script_params="$*"
 
-    cd $HOME
+    cd "$HOME" || cd
 
     # Secret name - to be used to determine if certificates already loaded
     OCP_SECRET="tf-certs"
@@ -275,7 +275,7 @@ function parse_params() {
 # OUTS: None if successful, Error text otherwise
 function ocp_login() {
 
-    ${oc_cmd} login --insecure-skip-tls-verify --server=${1} --username=${2} --password=${3}
+    ${oc_cmd} login --insecure-skip-tls-verify --server="${1}" --username="${2}" --password="${3}"
 
 }
 
@@ -287,7 +287,7 @@ function ocp_login() {
 # OUTS: None if successful, Error text otherwise
 function az_login() {
 
-    ${az_cmd} login --allow-no-subscriptions --service-principal --username=${1} --password=${2} --tenant=${3}
+    ${az_cmd} login --allow-no-subscriptions --service-principal --username="${1}" --password="${2}" --tenant="${3}"
 
 }
 
@@ -301,7 +301,7 @@ function patch_root_ca() {
 
     # Check if already present
     c_output=$(${oc_cmd} get proxy/cluster -o jsonpath='{.spec.trustedCA.name}')
-    if [[ -z ${c_output} || ${c_output} != ${1} ]]; then
+    if [[ -z ${c_output} || ${c_output} != "${1}" ]]; then
         replace=true
     fi
 
@@ -309,8 +309,8 @@ function patch_root_ca() {
     if [[ ${replace} != true ]]; then
         script_output "Root CA already present in proxy/cluster - skipping. Use FORCE=true environment variable to override"
     else
-        ${oc_cmd} create configmap ${1} --from-file=ca-bundle.crt=${2} -n openshift-config
-        ${oc_cmd} patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"'${1}'"}}}'
+        ${oc_cmd} create configmap "${1}" --from-file=ca-bundle.crt="${2}" -n openshift-config
+        ${oc_cmd} patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"'"${1}"'"}}}'
     fi
 }
 
@@ -326,15 +326,15 @@ function patch_ingress_cert() {
 
     # Check if already present
     c_output=$(${oc_cmd} get ingresscontroller.operator default -n openshift-ingress-operator -o jsonpath='{.spec.defaultCertificate.name}')
-    if [[ -z ${c_output} || ${c_output} != ${1} ]]; then
+    if [[ -z ${c_output} || ${c_output} != "${1}" ]]; then
         replace=true
     fi
 
     if [[ ${replace} != true ]]; then
         script_output "Certificate already present in ingress controller - skipping. Use FORCE=true environment variable to override"
     else
-        ${oc_cmd} create secret tls ${1} --cert=${2} --key=${3} -n openshift-ingress
-        ${oc_cmd} patch ingresscontroller.operator default --type=merge --patch='{"spec":{"defaultCertificate":{"name":"'${1}'"}}}' -n openshift-ingress-operator
+        ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-ingress
+        ${oc_cmd} patch ingresscontroller.operator default --type=merge --patch='{"spec":{"defaultCertificate":{"name":"'"${1}"'"}}}' -n openshift-ingress-operator
     fi
 }
 
@@ -350,16 +350,16 @@ function patch_api_cert() {
     local replace="${FORCE:-false}"
 
     # Check if already present
-    c_output=$(${oc_cmd} get apiserver cluster -o jsonpath='{.spec.servingCerts.namedCertificates[?(@.names[0]=="${4}")].servingCertificate.name}')
-    if [[ -z ${c_output} || ${c_output} != ${1} ]]; then
+    c_output=$(${oc_cmd} get apiserver cluster -o jsonpath='{.spec.servingCerts.namedCertificates[?(@.names[0]=="'"${4}"'")].servingCertificate.name}')
+    if [[ -z ${c_output} || ${c_output} != "${1}" ]]; then
         replace=true
     fi
 
     if [[ ${replace} != true ]]; then
         script_output "Certificate already present in API Server - skipping. Use FORCE=true environment variable to override"
     else
-        ${oc_cmd} create secret tls ${1} --cert=${2} --key=${3} -n openshift-config
-        ${oc_cmd} patch apiserver cluster --type=merge --patch='{"spec":{"servingCerts": {"namedCertificates":[{"names": ["'${4}'"],"servingCertificate": {"name": "'${1}'"}}]}}}'
+        ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-config
+        ${oc_cmd} patch apiserver cluster --type=merge --patch='{"spec":{"servingCerts": {"namedCertificates":[{"names": ["'"${4}"'"],"servingCertificate": {"name": "'"${1}"'"}}]}}}'
     fi
 }
 
@@ -370,13 +370,13 @@ function patch_api_cert() {
 function load_certs() {
 
     # Load key and cert from environment variables - fix new lines in process
-    echo ${KEY_PEM} | sed 's/\\n/\n/g' > ${key_filename}
+    echo "${KEY_PEM}" | sed 's/\\n/\n/g' > "${key_filename}"
 
-    echo ${CERT_PEM} | sed 's/\\n/\n/g' > ${cert_filename}
+    echo "${CERT_PEM}" | sed 's/\\n/\n/g' > "${cert_filename}"
 
     # Validate that certificate matches the key
-    c_cert_mod=$(${openssl_cmd} x509 -modulus -noout -in ${cert_filename} | ${openssl_cmd} md5)
-    c_key_mod=$(${openssl_cmd} rsa -modulus -noout -in ${key_filename} | ${openssl_cmd} md5)
+    c_cert_mod=$(${openssl_cmd} x509 -modulus -noout -in "${cert_filename}" | ${openssl_cmd} md5)
+    c_key_mod=$(${openssl_cmd} rsa -modulus -noout -in "${key_filename}" | ${openssl_cmd} md5)
 
     if [[ -z ${c_cert_mod} ]]; then
         script_exit "Failed to calculate certificate modulus" 2
@@ -386,7 +386,7 @@ function load_certs() {
         script_exit "Failed to calculate key modulus" 2
     fi
 
-    if [[ ${c_key_mod} != ${c_cert_mod} ]]; then
+    if [[ ${c_key_mod} != "${c_cert_mod}" ]]; then
         script_exit "Certificate and Key does not match" 2
     fi
 }
@@ -426,9 +426,10 @@ function main() {
     STATE=2
     # Patch API cert
     script_output "Attempting to replace API server certificate"
-    patch_api_cert "${OCP_SECRET}" "${cert_filename}" "${key_filename}" ${ARO_API_URL}
+    patch_api_cert "${OCP_SECRET}" "${cert_filename}" "${key_filename}" "${ARO_API_URL}"
 
     STATE=3
+    # Long sleep for debugging - remove when going prod
     sleep 10000
 
     script_exit "Command completed successfully" 0
