@@ -244,7 +244,7 @@ yum install -y python3 azure-cli which openssl
 
     # host name overrides - TBD
     echo "${ARO_API_IP} ${ARO_API_URL}" >> /etc/hosts
-    echo "${ARO_INGRESS_IP} ${ARO_INGRESS_URL}" >> /etc/hosts
+    echo "${ARO_INGRESS_IP} oauth-openshift.${ARO_INGRESS_URL}" >> /etc/hosts
 }
 
 
