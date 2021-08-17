@@ -311,7 +311,7 @@ function patch_root_ca() {
     if [[ ${replace} != true ]]; then
         script_output "Root CA already present in proxy/cluster - skipping. Use FORCE=true environment variable to override"
     else
-        ${oc_cmd} create configmap "${1}" --from-file=ca-bundle.crt="${2}" -n openshift-config
+        ${oc_cmd} create configmap "${1}" --from-file=ca-bundle.crt="${2}" -n openshift-config --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
         ${oc_cmd} patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"'"${1}"'"}}}'
     fi
 }
@@ -335,7 +335,7 @@ function patch_ingress_cert() {
     if [[ ${replace} != true ]]; then
         script_output "Certificate already present in ingress controller - skipping. Use FORCE=true environment variable to override"
     else
-        ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-ingress
+        ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-ingress --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
         ${oc_cmd} patch ingresscontroller.operator default --type=merge --patch='{"spec":{"defaultCertificate":{"name":"'"${1}"'"}}}' -n openshift-ingress-operator
     fi
 }
@@ -360,7 +360,7 @@ function patch_api_cert() {
     if [[ ${replace} != true ]]; then
         script_output "Certificate already present in API Server - skipping. Use FORCE=true environment variable to override"
     else
-        ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-config
+        ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-config  --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
         ${oc_cmd} patch apiserver cluster --type=merge --patch='{"spec":{"servingCerts": {"namedCertificates":[{"names": ["'"${4}"'"],"servingCertificate": {"name": "'"${1}"'"}}]}}}'
     fi
 }
