@@ -26,6 +26,7 @@
 #
 # KEY_PEM   - acme_certificate.cluster_cert.private_key_pem
 # CERT_PEM  - acme_certificate.cluster_cert.certificate_pem
+# ISSUER_PEM  - acme_certificate.cluster_cert.issuer_pem
 
 # v0.1 Yerzhan Beisembayev ybeisemb@redhat.com Yerzhan.Beisembayev@dh.com
 
@@ -128,6 +129,7 @@ Usage:
 
         CERT_PEM         - Certificate content in PEM format
         KEY_PEM          - Key content in PEM format
+        ISSUER_PEM       - Issuer certificates in PEM format
 
         OCP_VERSION      - OCP cli version to use (Optional - 4.7 is default)
         FORCE            - Overwrite certs if already present (optional)
@@ -186,6 +188,10 @@ function script_init() {
     if [[ -z ${KEY_PEM} ]]; then
         script_usage
         script_exit "KEY_PEM is not provided" 1
+    fi
+    if [[ -z ${ISSUER_PEM} ]]; then
+        script_usage
+        script_exit "ISSUER_PEM is not provided" 1
     fi
     if [[ -z ${CERT_PEM} ]]; then
         script_usage
@@ -378,6 +384,8 @@ function load_certs() {
     echo "${KEY_PEM}" | sed 's/\\n/\n/g' > "${key_filename}"
 
     echo "${CERT_PEM}" | sed 's/\\n/\n/g' > "${cert_filename}"
+
+    echo "${ISSUER_PEM}" | sed 's/\\n/\n/g' >> "${cert_filename}"
 
     # Validate that certificate matches the key
     c_cert_mod=$(${openssl_cmd} x509 -modulus -noout -in "${cert_filename}" | ${openssl_cmd} md5)
