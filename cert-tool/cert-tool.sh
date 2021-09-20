@@ -29,9 +29,15 @@
 # ISSUER_PEM  - acme_certificate.cluster_cert.issuer_pem
 
 # v0.1 Yerzhan Beisembayev ybeisemb@redhat.com Yerzhan.Beisembayev@dh.com
+# v0.2 Yerzhan Beisembayev ybeisemb@redhat.com Yerzhan.Beisembayev@dh.com
+#      - Remove timestamps from secret name - do not overwrite/replace secret/cert if it is already present
+#      - Add function to replace MCM ingress secret using cert/keys provided
 
 # track the state of the process to be able to report cluster state if error occur
 STATE=0
+
+# Include MCM ingress fix
+MCM_FIX="no"
 
 # Enable xtrace if the DEBUG environment variable is set
 if [[ ${DEBUG-} =~ ^1|yes|true$ ]]; then
@@ -119,6 +125,7 @@ script_usage () {
     cat << EOF
 Usage:
     -h|--help		Displays this help
+    -m              Fix MCM ingress secret (optional)
     *               All parameters should be passed via environment variables
         ARO_API_IP       - ARO API IP Address
         ARO_API_URL      - ARO API URL
@@ -147,7 +154,8 @@ function script_init() {
     cd "$HOME" || cd
 
     # Secret name - to be used to determine if certificates already loaded
-    OCP_SECRET="tf-certs-$(date +%s)"
+    # OCP_SECRET="tf-certs-$(date +%s)"
+    OCP_SECRET="tf-certs"
     if [[ ${FORCE} =~ ^1|yes|true$ ]]; then
         FORCE=true
     else
@@ -267,6 +275,9 @@ function parse_params() {
                 script_usage
                 script_exit ""
                 ;;
+            -m)
+                MCM_FIX="yes"
+                ;;
             *)
                 script_usage
                 script_exit "Command line parameters will be ignored - all data should be passed via environment variables" 2
@@ -375,6 +386,38 @@ function patch_api_cert() {
 }
 
 
+# DESC: Patch MCM ingress controller certificate
+# ARGS: $1 - secret name
+# $2 - certificate file name
+# $3 - private key file name
+# OUTS: None if successful, Error text otherwise
+function patch_mcm_ingress_cert() {
+    local c_output=""
+    local replace="${FORCE:-false}"
+
+    MANAGEMENT_INGRESS=$(${oc_cmd} get deployment -o custom-columns=:.metadata.name -n open-cluster-management | grep management-ingress)
+
+    if [[ -z ${MANAGEMENT_INGRESS} ]]; then
+        script_output "MCM management ingress is not found. Does RHACM deployed on this cluster?"
+    else
+        # Check if already present
+        c_output=$(${oc_cmd} get deployment ${MANAGEMENT_INGRESS} -o jsonpath='{.spec.template.spec.volumes[?(@.name=="tls-secret")].secret.secretName}' -n open-cluster-management)
+#        if [[ -z ${c_output} ]]; then
+        if [[ -z ${c_output} || ${c_output} != "${1}" ]]; then
+            replace=true
+        fi
+
+        if [[ ${replace} != true ]]; then
+            script_output "Certificate already present in MCM ingress controller - skipping. Use FORCE=true environment variable to override"
+        else
+            ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n open-cluster-management --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
+            ${oc_cmd} patch deployment ${MANAGEMENT_INGRESS} --patch='{"spec":{"template":{"spec":{"volumes": [{"name": "tls-secret", "secret":{"secretName":"'"${1}"'"}}]}}}}' -n open-cluster-management
+        fi
+    fi
+}
+
+
+
 # DESC: Load certificate and key
 # ARGS: none
 # OUTS: None if successful, Error text otherwise
@@ -442,6 +485,12 @@ function main() {
     patch_api_cert "${OCP_SECRET}" "${cert_filename}" "${key_filename}" "${ARO_API_URL}"
 
     STATE=3
+    # Patch MCM Ingress cert
+    if [[ "${MCM_FIX}" == "yes" ]]; then
+        patch_mcm_ingress_cert "${OCP_SECRET}" "${cert_filename}" "${key_filename}"
+    fi
+
+    STATE=4
     # Long sleep for debugging - remove when going prod
     sleep 10000
 
