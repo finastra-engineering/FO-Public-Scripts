@@ -23,7 +23,7 @@ checkStatus()
 
   echo "...checking pod labels ${LABEL} at namespace ${NAMESPACE}..."
   ATTEMPTS=0
-  until [[ $ATTEMPTS -ge 10 ]]
+  until [[ ${ATTEMPTS} -ge 10 ]]
   do
     PODS_READY=$(oc get pod  -l "${1}" --field-selector=status.phase==Running -o jsonpath="{.items[*].metadata.name}" -n"${NAMESPACE}" | wc -w)
     if [[ $PODS_READY -eq $EXPECTED_PODS ]]; then
@@ -34,104 +34,10 @@ checkStatus()
     echo "Sleep 10s and check again."
     sleep 10
   done
-  if [[ $PODS_READY -ne $EXPECTED_PODS ]]; then
+  if [[ ${PODS_READY} -ne ${EXPECTED_PODS} ]]; then
     echo "...not found expected pods. exit"
     exit 1
   fi
-}
-
-# create config map to move
-monitoringConfigMap()
-{
-  cat <<EOT | oc apply -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cluster-monitoring-config
-  namespace: openshift-monitoring
-data:
-  config.yaml: |+
-    alertmanagerMain:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
-      tolerations:
-      - key: infra
-        value: reserved
-        effect: NoSchedule
-      - key: infra
-        value: reserved
-        effect: NoExecute
-    prometheusK8s:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
-      tolerations:
-      - key: infra
-        value: reserved
-        effect: NoSchedule
-      - key: infra
-        value: reserved
-        effect: NoExecute
-    prometheusOperator:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
-      tolerations:
-      - key: infra
-        value: reserved
-        effect: NoSchedule
-      - key: infra
-        value: reserved
-        effect: NoExecute
-    grafana:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
-      tolerations:
-      - key: infra
-        value: reserved
-        effect: NoSchedule
-      - key: infra
-        value: reserved
-        effect: NoExecute
-    k8sPrometheusAdapter:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
-      tolerations:
-      - key: infra
-        value: reserved
-        effect: NoSchedule
-      - key: infra
-        value: reserved
-        effect: NoExecute
-    kubeStateMetrics:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
-      tolerations:
-      - key: infra
-        value: reserved
-        effect: NoSchedule
-      - key: infra
-        value: reserved
-        effect: NoExecute
-    telemeterClient:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
-      tolerations:
-      - key: infra
-        value: reserved
-        effect: NoSchedule
-      - key: infra
-        value: reserved
-        effect: NoExecute
-    openshiftStateMetrics:
-      nodeSelector:
-        node-role.kubernetes.io/infra: ""
-      tolerations:
-      - key: infra
-        value: reserved
-        effect: NoSchedule
-      - key: infra
-        value: reserved
-        effect: NoExecute
-EOT
 }
 
 # exit in case of any errors
@@ -142,7 +48,7 @@ echo "Moving apps into infra nodes..."
 # Check if infra nodes are available
 INFRA_NODES=$(oc get nodes -l node-role.kubernetes.io/infra -o jsonpath='{.items[*].metadata.name}' | wc -w)
 
-if [[ $INFRA_NODES -lt 3 ]]; then
+if [[ ${INFRA_NODES} -lt 3 ]]; then
   echo "Required at least 3 infra nodes to be available. Exit"
   exit 1
 else
@@ -167,7 +73,8 @@ echo "...default Registry moved"
 
 # Monitoring
 echo "...moving Monitoring stack"
-monitoringConfigMap
+curl -s -L https://raw.githubusercontent.com/finastra-engineering/FO-Public-Scripts/main/move-to-infra/cluster-monitoring-configmap.yaml -o cluster-monitoring-configmap.yaml
+oc apply -f cluster-monitoring-configmap.yaml
 checkStatus "app=alertmanager" "openshift-monitoring" "3"
 checkStatus "app=grafana" "openshift-monitoring" "1"
 checkStatus "app.kubernetes.io/name=kube-state-metrics" "openshift-monitoring" "1"
