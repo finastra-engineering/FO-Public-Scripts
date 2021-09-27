@@ -43,7 +43,7 @@ checkStatus()
 # create config map to move
 monitoringConfigMap()
 {
-  cat <<EOT > cluster-monitoring-configmap.yaml
+  cat <<EOT | oc apply -f -
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -168,7 +168,6 @@ echo "...default Registry moved"
 # Monitoring
 echo "...moving Monitoring stack"
 monitoringConfigMap
-oc apply -f cluster-monitoring-configmap.yaml
 checkStatus "app=alertmanager" "openshift-monitoring" "3"
 checkStatus "app=grafana" "openshift-monitoring" "1"
 checkStatus "app.kubernetes.io/name=kube-state-metrics" "openshift-monitoring" "1"
