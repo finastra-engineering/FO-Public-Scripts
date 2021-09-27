@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script moves ARO apps into intrastructure nodes.
 # It follows RHEL guide: https://access.redhat.com/solutions/5034771
