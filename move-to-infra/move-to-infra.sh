@@ -20,17 +20,17 @@ checkStatus()
   LABEL="$1"
   NAMESPACE="$2"
   EXPECTED_PODS="$3"
-  
+
   echo "...checking pod labels ${LABEL} at namespace ${NAMESPACE}..."
   ATTEMPTS=0
   until [[ $ATTEMPTS -ge 10 ]]
   do
-    PODS_READY=$(oc get pod  -l "${1}" --field-selector=status.phase==Running -o jsonpath="{.items[*].metadata.name}" -n${NAMESPACE} | wc -w)
+    PODS_READY=$(oc get pod  -l "${1}" --field-selector=status.phase==Running -o jsonpath="{.items[*].metadata.name}" -n"${NAMESPACE}" | wc -w)
     if [[ $PODS_READY -eq $EXPECTED_PODS ]]; then
       echo "...found expected pods running"
       break
     fi
-    ATTEMPTS=$[$ATTEMPTS+1]
+    ATTEMPTS=$((ATTEMPTS+1))
     echo "Sleep 10s and check again."
     sleep 10
   done
@@ -40,7 +40,7 @@ checkStatus()
   fi
 }
 
-# create config map to move 
+# create config map to move
 monitoringConfigMap()
 {
   cat <<EOT > cluster-monitoring-configmap.yaml
