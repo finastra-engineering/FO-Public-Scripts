@@ -26,7 +26,7 @@ checkStatus()
   until [[ ${ATTEMPTS} -ge 10 ]]
   do
     PODS_READY=$(oc get pod  -l "${1}" --field-selector=status.phase==Running -o jsonpath="{.items[*].metadata.name}" -n"${NAMESPACE}" | wc -w)
-    if [[ $PODS_READY -eq $EXPECTED_PODS ]]; then
+    if [[ ${PODS_READY} -eq ${EXPECTED_PODS} ]]; then
       echo "...found expected pods running"
       break
     fi
