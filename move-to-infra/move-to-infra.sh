@@ -74,7 +74,8 @@ echo "...default Registry moved"
 # Monitoring
 echo "...moving Monitoring stack"
 curl -s -L https://raw.githubusercontent.com/finastra-engineering/FO-Public-Scripts/main/move-to-infra/cluster-monitoring-configmap.yaml -o cluster-monitoring-configmap.yaml
-if [[ -f cluster-monitoring-configmap.yaml ]]; then
+ret="$?"
+if [[ "$ret" -eq 0 ]]; then
   oc apply -f cluster-monitoring-configmap.yaml
 else
   echo "...missing configmap to be applied for monitoring"
