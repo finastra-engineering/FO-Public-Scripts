@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2001,SC2086,SC2230,SC2034,SC2164
 
 # Script to implement a workaround for a ARO certificate issue
 # ARO provisioning process does not create CA certificate for API and Ingress end points when custom domain name is used
