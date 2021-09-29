@@ -73,7 +73,7 @@ echo "...default Registry moved"
 
 # Monitoring
 echo "...moving Monitoring stack"
-curl -s -L --fail https://raw.githubusercontent.com/finastra-engineering/FO-Public-Scripts/main/move-to-infra/cluster-monitoring-configmap.yaml -o cluster-monitoring-configmap.yaml
+curl -s -L --fail https://raw.githubusercontent.com/finastra-engineering/FO-Public-Scripts/v1.0.0/move-to-infra/cluster-monitoring-configmap.yaml -o cluster-monitoring-configmap.yaml
 ret="$?"
 if [[ "$ret" -eq 0 ]]; then
   oc apply -f cluster-monitoring-configmap.yaml
