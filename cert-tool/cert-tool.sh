@@ -155,8 +155,8 @@ function script_init() {
     cd "$HOME" || cd
 
     # Secret name - to be used to determine if certificates already loaded
-    # OCP_SECRET="tf-certs-$(date +%s)"
-    OCP_SECRET="tf-certs"
+    OCP_SECRET="tf-certs-$(date +%s)"
+    # OCP_SECRET="tf-certs"
     if [[ ${FORCE} =~ ^1|yes|true$ ]]; then
         FORCE=true
     else
