@@ -26,7 +26,7 @@ checkStatus()
   until [[ ${ATTEMPTS} -ge 10 ]]
   do
     PODS_READY=$(oc get pod  -l "${1}" --field-selector=status.phase==Running -o jsonpath="{.items[*].metadata.name}" -n"${NAMESPACE}" | wc -w)
-    if [[ ${PODS_READY} -eq ${EXPECTED_PODS} ]]; then
+    if [[ ${PODS_READY} -ge ${EXPECTED_PODS} ]]; then
       echo "...found expected pods running"
       break
     fi
@@ -34,7 +34,7 @@ checkStatus()
     echo "Sleep 10s and check again."
     sleep 10
   done
-  if [[ ${PODS_READY} -ne ${EXPECTED_PODS} ]]; then
+  if [[ ${PODS_READY} -lt ${EXPECTED_PODS} ]]; then
     echo "...not found expected pods. exit"
     exit 1
   fi
@@ -73,7 +73,7 @@ echo "...default Registry moved"
 
 # Monitoring
 echo "...moving Monitoring stack"
-curl -s -L --fail https://raw.githubusercontent.com/finastra-engineering/FO-Public-Scripts/v1.0.0/move-to-infra/cluster-monitoring-configmap.yaml -o cluster-monitoring-configmap.yaml
+curl -s -L --fail https://raw.githubusercontent.com/finastra-engineering/FO-Public-Scripts/v1.1.0/move-to-infra/cluster-monitoring-configmap.yaml -o cluster-monitoring-configmap.yaml
 ret="$?"
 if [[ "$ret" -eq 0 ]]; then
   oc apply -f cluster-monitoring-configmap.yaml
@@ -82,10 +82,10 @@ else
   exit 1
 fi
 checkStatus "app=alertmanager" "openshift-monitoring" "3"
-checkStatus "app=grafana" "openshift-monitoring" "1"
+checkStatus "app.kubernetes.io/name=grafana" "openshift-monitoring" "1"
 checkStatus "app.kubernetes.io/name=kube-state-metrics" "openshift-monitoring" "1"
 checkStatus "k8s-app=openshift-state-metrics" "openshift-monitoring" "1"
-checkStatus "name=prometheus-adapter" "openshift-monitoring" "2"
+checkStatus "app.kubernetes.io/name=prometheus-adapter" "openshift-monitoring" "2"
 checkStatus "app=prometheus" "openshift-monitoring" "2"
 echo "...Monitoring stack moved"
 echo "done"
