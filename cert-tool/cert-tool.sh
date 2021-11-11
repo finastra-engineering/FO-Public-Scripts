@@ -467,7 +467,7 @@ function load_current_state() {
     INGRESS_READYREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
     INGRESS_UPDATEDREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
 
-    NEXT_INGRESS_GENERATION=$(($INGRESS_GENERATION + 1))
+    NEXT_INGRESS_GENERATION=$((INGRESS_GENERATION + 1))
 
     read -r API_NAME API_VERSION API_AVAILABLE API_PROGRESSING API_DEGRADED API_SINCE <<< "$(${oc_cmd} get clusteroperators kube-apiserver | grep -v 'NAME')"
 }
