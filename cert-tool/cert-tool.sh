@@ -461,15 +461,15 @@ function load_certs() {
 # ARGS: none
 # OUTS: None if successful, Error text otherwise
 function load_current_state() {
-    INGRESS_GENERATION=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.observedGeneration')
-    INGRESS_REPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.replicas')
-    INGRESS_AVAILABLEREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.availableReplicas')
-    INGRESS_READYREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
-    INGRESS_UPDATEDREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
+    INGRESS_GENERATION=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.observedGeneration')
+    INGRESS_REPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.replicas')
+    INGRESS_AVAILABLEREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.availableReplicas')
+    INGRESS_READYREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
+    INGRESS_UPDATEDREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
 
     NEXT_INGRESS_GENERATION=$(expr ${INGRESS_GENERATION} + 1)
 
-    read API_NAME API_VERSION API_AVAILABLE API_PROGRESSING API_DEGRADED API_SINCE <<< $(oc get clusteroperators kube-apiserver | grep -v "NAME")
+    read API_NAME API_VERSION API_AVAILABLE API_PROGRESSING API_DEGRADED API_SINCE <<< $(${oc_cmd} get clusteroperators kube-apiserver | grep -v "NAME")
 }
 
 
@@ -493,17 +493,17 @@ function validate_state() {
         fi
 
         # Checking default ingress status
-        C_INGRESS_GENERATION=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.observedGeneration')
-        C_INGRESS_REPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.replicas')
-        C_INGRESS_AVAILABLEREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.availableReplicas')
-        C_INGRESS_READYREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
-        C_INGRESS_UPDATEDREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
+        C_INGRESS_GENERATION=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.observedGeneration')
+        C_INGRESS_REPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.replicas')
+        C_INGRESS_AVAILABLEREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.availableReplicas')
+        C_INGRESS_READYREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
+        C_INGRESS_UPDATEDREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
 
         if [[ ${C_INGRESS_GENERATION} -eq ${NEXT_INGRESS_GENERATION} && ${INGRESS_REPLICAS} -eq ${C_INGRESS_REPLICAS} && ${INGRESS_AVAILABLEREPLICAS} -eq ${C_INGRESS_AVAILABLEREPLICAS} && ${INGRESS_READYREPLICAS} -eq ${C_INGRESS_READYREPLICAS} && ${INGRESS_UPDATEDREPLICAS} -eq ${C_INGRESS_UPDATEDREPLICAS} ]]; then
             INGRESS_COMPLETE=true
         fi
         # Checking kube-apiserver operator status
-        read C_API_NAME C_API_VERSION C_API_AVAILABLE C_API_PROGRESSING C_API_DEGRADED C_API_SINCE <<< $(oc get clusteroperators kube-apiserver | grep -v "NAME")
+        read C_API_NAME C_API_VERSION C_API_AVAILABLE C_API_PROGRESSING C_API_DEGRADED C_API_SINCE <<< $(${oc_cmd} get clusteroperators kube-apiserver | grep -v "NAME")
         if [[ ${C_API_AVAILABLE} == "True" && ${C_API_PROGRESSING} == "False" && ${C_API_DEGRADED} == "False" ]]; then
             API_COMPLETE=true
         fi
