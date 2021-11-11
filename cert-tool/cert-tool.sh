@@ -224,7 +224,7 @@ enabled=1
 gpgcheck=1
 gpgkey=https://packages.microsoft.com/keys/microsoft.asc
 EOF
-yum install -y python3 azure-cli which openssl
+yum install -y python3 azure-cli which openssl jq
 
     # Set tools vars
     if [[ -x "/usr/bin/oc" ]]; then
@@ -329,9 +329,11 @@ function patch_root_ca() {
     # Replace
     if [[ ${replace} != true ]]; then
         script_output "Root CA already present in proxy/cluster - skipping. Use FORCE=true environment variable to override"
+        ROOT_CA_PATCHED=false
     else
         ${oc_cmd} create configmap "${1}" --from-file=ca-bundle.crt="${2}" -n openshift-config --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
         ${oc_cmd} patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"'"${1}"'"}}}'
+        ROOT_CA_PATCHED=true
     fi
 }
 
@@ -354,9 +356,11 @@ function patch_ingress_cert() {
 
     if [[ ${replace} != true ]]; then
         script_output "Certificate already present in ingress controller - skipping. Use FORCE=true environment variable to override"
+        INGRESS_PATCHED=false
     else
         ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-ingress --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
         ${oc_cmd} patch ingresscontroller.operator default --type=merge --patch='{"spec":{"defaultCertificate":{"name":"'"${1}"'"}}}' -n openshift-ingress-operator
+        INGRESS_PATCHED=true
     fi
 }
 
@@ -380,9 +384,11 @@ function patch_api_cert() {
 
     if [[ ${replace} != true ]]; then
         script_output "Certificate already present in API Server - skipping. Use FORCE=true environment variable to override"
+        API_PATCHED=false
     else
         ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-config  --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
         ${oc_cmd} patch apiserver cluster --type=merge --patch='{"spec":{"servingCerts": {"namedCertificates":[{"names": ["'"${4}"'"],"servingCertificate": {"name": "'"${1}"'"}}]}}}'
+        API_PATCHED=true
     fi
 }
 
@@ -410,9 +416,11 @@ function patch_mcm_ingress_cert() {
 
         if [[ ${replace} != true ]]; then
             script_output "Certificate already present in MCM ingress controller - skipping. Use FORCE=true environment variable to override"
+            MCM_INGRESS_PATCHED=false
         else
             ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n open-cluster-management --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
             ${oc_cmd} patch deployment ${MANAGEMENT_INGRESS} --patch='{"spec":{"template":{"spec":{"volumes": [{"name": "tls-secret", "secret":{"secretName":"'"${1}"'"}}]}}}}' -n open-cluster-management
+            MCM_INGRESS_PATCHED=true
         fi
     fi
 }
@@ -449,6 +457,61 @@ function load_certs() {
 }
 
 
+# DESC: Load current state
+# ARGS: none
+# OUTS: None if successful, Error text otherwise
+function load_current_state() {
+    INGRESS_GENERATION=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.observedGeneration')
+    INGRESS_REPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.replicas')
+    INGRESS_AVAILABLEREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.availableReplicas')
+    INGRESS_READYREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
+    INGRESS_UPDATEDREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
+
+    NEXT_INGRESS_GENERATION=$(expr ${INGRESS_GENERATION} + 1)
+
+    read API_NAME API_VERSION API_AVAILABLE API_PROGRESSING API_DEGRADED API_SINCE <<< $(oc get clusteroperators kube-apiserver | grep -v "NAME")
+}
+
+
+# DESC: Load current state
+# ARGS: none
+# OUTS: None if successful, Error text otherwise
+function validate_state() {
+    SLEEP=60
+    INGRESS_COMPLETE=false
+    if [[ ${INGRESS_PATCHED} == false ]]; then
+        INGRESS_COMPLETE=true
+    fi
+    API_COMPLETE=false
+    if [[ ${API_PATCHED} == false ]]; then
+        API_COMPLETE=true
+    fi
+    for ITER in {0..15}
+    do
+        if [[ ${INGRESS_COMPLETE} == true && ${API_COMPLETE} == true ]]; then
+            break
+        fi
+
+        # Checking default ingress status
+        C_INGRESS_GENERATION=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.observedGeneration')
+        C_INGRESS_REPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.replicas')
+        C_INGRESS_AVAILABLEREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.availableReplicas')
+        C_INGRESS_READYREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
+        C_INGRESS_UPDATEDREPLICAS=$(oc get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
+
+        if [[ ${C_INGRESS_GENERATION} -eq ${NEXT_INGRESS_GENERATION} && ${INGRESS_REPLICAS} -eq ${C_INGRESS_REPLICAS} && ${INGRESS_AVAILABLEREPLICAS} -eq ${C_INGRESS_AVAILABLEREPLICAS} && ${INGRESS_READYREPLICAS} -eq ${C_INGRESS_READYREPLICAS} && ${INGRESS_UPDATEDREPLICAS} -eq ${C_INGRESS_UPDATEDREPLICAS} ]]; then
+            INGRESS_COMPLETE=true
+        fi
+        # Checking kube-apiserver operator status
+        read C_API_NAME C_API_VERSION C_API_AVAILABLE C_API_PROGRESSING C_API_DEGRADED C_API_SINCE <<< $(oc get clusteroperators kube-apiserver | grep -v "NAME")
+        if [[ ${C_API_AVAILABLE} == "True" && ${C_API_PROGRESSING} == "False" && ${C_API_DEGRADED} == "False" ]]; then
+            API_COMPLETE=true
+        fi
+
+        sleep ${SLEEP}
+    done
+}
+
 # DESC: Main control flow
 # ARGS: $@ (optional): Arguments provided to the script
 # OUTS: None
@@ -471,6 +534,9 @@ function main() {
 #    # Log in to Azure
 #    az_login "${AZ_CLIENT_ID}" "${AZ_CLIENT_SECRET}" "${AZ_TENANT_ID}"
 
+    # Load current state
+    load_current_state
+
     # Patch Root CA cert
 #    script_output "Attempting to patch Root CA"
 #    patch_root_ca "${OCP_SECRET}" "${caroot_filename}"
@@ -492,8 +558,9 @@ function main() {
     fi
 
     STATE=4
-    # Long sleep for debugging - remove when going prod
-    sleep 10000
+    # Validating
+    sleep 60
+    validate_state
 
     script_exit "Command completed successfully" 0
 }
