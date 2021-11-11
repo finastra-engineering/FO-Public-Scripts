@@ -467,9 +467,9 @@ function load_current_state() {
     INGRESS_READYREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
     INGRESS_UPDATEDREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
 
-    NEXT_INGRESS_GENERATION=$(expr ${INGRESS_GENERATION} + 1)
+    NEXT_INGRESS_GENERATION=$((${INGRESS_GENERATION} + 1))
 
-    read API_NAME API_VERSION API_AVAILABLE API_PROGRESSING API_DEGRADED API_SINCE <<< $(${oc_cmd} get clusteroperators kube-apiserver | grep -v "NAME")
+    read -r API_NAME API_VERSION API_AVAILABLE API_PROGRESSING API_DEGRADED API_SINCE <<< $(${oc_cmd} get clusteroperators kube-apiserver | grep -v "NAME")
 }
 
 
@@ -503,7 +503,7 @@ function validate_state() {
             INGRESS_COMPLETE=true
         fi
         # Checking kube-apiserver operator status
-        read C_API_NAME C_API_VERSION C_API_AVAILABLE C_API_PROGRESSING C_API_DEGRADED C_API_SINCE <<< $(${oc_cmd} get clusteroperators kube-apiserver | grep -v "NAME")
+        read -r C_API_NAME C_API_VERSION C_API_AVAILABLE C_API_PROGRESSING C_API_DEGRADED C_API_SINCE <<< $(${oc_cmd} get clusteroperators kube-apiserver | grep -v "NAME")
         if [[ ${C_API_AVAILABLE} == "True" && ${C_API_PROGRESSING} == "False" && ${C_API_DEGRADED} == "False" ]]; then
             API_COMPLETE=true
         fi
