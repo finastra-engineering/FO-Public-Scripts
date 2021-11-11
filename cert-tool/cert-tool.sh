@@ -461,12 +461,11 @@ function load_certs() {
 # ARGS: none
 # OUTS: None if successful, Error text otherwise
 function load_current_state() {
-    ROUTER_RESOURCE=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json)
-    INGRESS_GENERATION=$(echo ${ROUTER_RESOURCE} | jq -r '.status.observedGeneration')
-    INGRESS_REPLICAS=$(echo ${ROUTER_RESOURCE} | jq -r '.status.replicas')
-    INGRESS_AVAILABLEREPLICAS=$(echo ${ROUTER_RESOURCE} | jq -r '.status.availableReplicas')
-    INGRESS_READYREPLICAS=$(echo ${ROUTER_RESOURCE} | jq -r '.status.readyReplicas')
-    INGRESS_UPDATEDREPLICAS=$(echo ${ROUTER_RESOURCE} | jq -r '.status.updatedReplicas')
+    INGRESS_GENERATION=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.observedGeneration')
+    INGRESS_REPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json) | jq -r '.status.replicas')
+    INGRESS_AVAILABLEREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.availableReplicas')
+    INGRESS_READYREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
+    INGRESS_UPDATEDREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
 
     NEXT_INGRESS_GENERATION=$((INGRESS_GENERATION + 1))
 
@@ -494,12 +493,11 @@ function validate_state() {
         fi
 
         # Checking default ingress status
-        C_ROUTER_RESOURCE=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json)
-        C_INGRESS_GENERATION=$(echo ${ROUTER_RESOURCE} | jq -r '.status.observedGeneration')
-        C_INGRESS_REPLICAS=$(echo ${ROUTER_RESOURCE} | jq -r '.status.replicas')
-        C_INGRESS_AVAILABLEREPLICAS=$(echo ${ROUTER_RESOURCE} | jq -r '.status.availableReplicas')
-        C_INGRESS_READYREPLICAS=$(echo ${ROUTER_RESOURCE} | jq -r '.status.readyReplicas')
-        C_INGRESS_UPDATEDREPLICAS=$(echo ${ROUTER_RESOURCE} | jq -r '.status.updatedReplicas')
+        C_INGRESS_GENERATION=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.observedGeneration')
+        C_INGRESS_REPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json) | jq -r '.status.replicas')
+        C_INGRESS_AVAILABLEREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.availableReplicas')
+        C_INGRESS_READYREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
+        C_INGRESS_UPDATEDREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
 
         if [[ ${C_INGRESS_GENERATION} -ge ${INGRESS_GENERATION} && ${INGRESS_REPLICAS} -eq ${C_INGRESS_REPLICAS} && ${INGRESS_AVAILABLEREPLICAS} -eq ${C_INGRESS_AVAILABLEREPLICAS} && ${INGRESS_READYREPLICAS} -eq ${C_INGRESS_READYREPLICAS} && ${INGRESS_UPDATEDREPLICAS} -eq ${C_INGRESS_UPDATEDREPLICAS} ]]; then
             INGRESS_COMPLETE=true
