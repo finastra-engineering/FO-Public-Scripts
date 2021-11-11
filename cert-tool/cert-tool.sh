@@ -462,7 +462,7 @@ function load_certs() {
 # OUTS: None if successful, Error text otherwise
 function load_current_state() {
     INGRESS_GENERATION=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.observedGeneration')
-    INGRESS_REPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json) | jq -r '.status.replicas')
+    INGRESS_REPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.replicas')
     INGRESS_AVAILABLEREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.availableReplicas')
     INGRESS_READYREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
     INGRESS_UPDATEDREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
@@ -494,7 +494,7 @@ function validate_state() {
 
         # Checking default ingress status
         C_INGRESS_GENERATION=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.observedGeneration')
-        C_INGRESS_REPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json) | jq -r '.status.replicas')
+        C_INGRESS_REPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.replicas')
         C_INGRESS_AVAILABLEREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.availableReplicas')
         C_INGRESS_READYREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.readyReplicas')
         C_INGRESS_UPDATEDREPLICAS=$(${oc_cmd} get deployment router-default -n openshift-ingress -o json | jq -r '.status.updatedReplicas')
