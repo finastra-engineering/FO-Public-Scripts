@@ -563,6 +563,7 @@ function main() {
     validate_state
 
     script_exit "Command completed successfully" 0
+    sleep 10000
 }
 
 
