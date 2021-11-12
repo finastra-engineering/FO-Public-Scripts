@@ -438,7 +438,7 @@ function load_certs() {
     echo "${CERT_PEM}" | sed 's/\\n/\n/g' > "${cert_filename}"
 
     # Workaround for ISRG Root X1 cert issue - if there are more than one issuer cert - remove the second one.
-    # Azure AppGate will accpet certs only when there is only R3 issuer cert in the chain.
+    # Azure AppGate will accept certs only when there is only R3 issuer cert in the chain.
     # It will fail validation if cert chain contains ISRG Root X1 cert
     # We need to keep only R3 issuer cert in the chain
     CERT_CHAIN="${ISSUER_PEM}"
