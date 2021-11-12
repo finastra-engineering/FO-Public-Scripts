@@ -442,7 +442,7 @@ function load_certs() {
     # It will fail validation if cert chain contains ISRG Root X1 cert
     # We need to keep only R3 issuer cert in the chain
     CERT_CHAIN="${ISSUER_PEM}"
-    ISSUER_CERT_NUM=$(echo "${ISSUER_PEM}" | grep "BEGIN CERTIFICATE" | wc -l)
+    ISSUER_CERT_NUM=$(echo "${ISSUER_PEM}" | grep -c "BEGIN CERTIFICATE")
     if [[ ${NUM} -gt 1 ]]; then
         script_output "Two issuer certs detected in the chain - removing the second one"
         CERT_CHAIN=$(echo "${ISSUER_PEM}" | sed  '/-----END CERTIFICATE-----/q')
