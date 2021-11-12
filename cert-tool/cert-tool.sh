@@ -437,7 +437,18 @@ function load_certs() {
 
     echo "${CERT_PEM}" | sed 's/\\n/\n/g' > "${cert_filename}"
 
-    echo "${ISSUER_PEM}" | sed 's/\\n/\n/g' >> "${cert_filename}"
+    # Workaround for ISRG Root X1 cert issue - if there are more than one issuer cert - remove the second one.
+    # Azure AppGate will accpet certs only when there is only R3 issuer cert in the chain.
+    # It will fail validation if cert chain contains ISRG Root X1 cert
+    # We need to keep only R3 issuer cert in the chain
+    CERT_CHAIN="${ISSUER_PEM}"
+    ISSUER_CERT_NUM=$(echo "${ISSUER_PEM}" | grep "BEGIN CERTIFICATE" | wc -l)
+    if [[ ${NUM} -gt 1 ]]; then
+        script_output "Two issuer certs detected in the chain - removing the second one"
+        CERT_CHAIN=$(echo "${ISSUER_PEM}" | sed  '/-----END CERTIFICATE-----/q')
+    fi
+
+    echo "${CERT_CHAIN}" | sed 's/\\n/\n/g' >> "${cert_filename}"
 
     # Validate that certificate matches the key
     c_cert_mod=$(${openssl_cmd} x509 -modulus -noout -in "${cert_filename}" | ${openssl_cmd} md5)
@@ -559,10 +570,9 @@ function main() {
 
     STATE=4
     # Validating
-    sleep 60
+    sleep 180
     validate_state
 
-    sleep 10000
     script_exit "Command completed successfully" 0
 }
 
