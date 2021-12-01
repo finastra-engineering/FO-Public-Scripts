@@ -155,8 +155,12 @@ function script_init() {
     cd "$HOME" || cd
 
     # Secret name - to be used to determine if certificates already loaded
-    OCP_SECRET="tf-certs-$(date +%s)"
-    # OCP_SECRET="tf-certs"
+    # OCP_SECRET="tf-certs-$(date +%s)"
+    INGRESS_SECRET="router-certs-default"
+    API_SECRET="cluster-api"
+    MCMINGRESS_SECRET="mcm-ingress-certs"
+    ROOT_CFMAP="root-certs"
+
     if [[ ${FORCE} =~ ^1|yes|true$ ]]; then
         FORCE=true
     else
@@ -550,22 +554,22 @@ function main() {
 
     # Patch Root CA cert
 #    script_output "Attempting to patch Root CA"
-#    patch_root_ca "${OCP_SECRET}" "${caroot_filename}"
+#    patch_root_ca "${ROOT_CFMAP}" "${caroot_filename}"
 
     STATE=1
     # Patch Ingress cert
     script_output "Attempting to replace iingress certificate"
-    patch_ingress_cert "${OCP_SECRET}" "${cert_filename}" "${key_filename}"
+    patch_ingress_cert "${INGRESS_SECRET}" "${cert_filename}" "${key_filename}"
 
     STATE=2
     # Patch API cert
     script_output "Attempting to replace API server certificate"
-    patch_api_cert "${OCP_SECRET}" "${cert_filename}" "${key_filename}" "${ARO_API_URL}"
+    patch_api_cert "${API_SECRET}" "${cert_filename}" "${key_filename}" "${ARO_API_URL}"
 
     STATE=3
     # Patch MCM Ingress cert
     if [[ "${MCM_FIX}" == "yes" ]]; then
-        patch_mcm_ingress_cert "${OCP_SECRET}" "${cert_filename}" "${key_filename}"
+        patch_mcm_ingress_cert "${MCMINGRESS_SECRET}" "${cert_filename}" "${key_filename}"
     fi
 
     STATE=4
