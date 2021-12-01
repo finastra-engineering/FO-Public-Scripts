@@ -56,6 +56,8 @@ else
 fi
 
 # Default router
+echo "...setting sharding for default Router"
+oc patch ingresscontroller/default -n  openshift-ingress-operator  --type=merge -p '{"spec":{"namespaceSelector":{"matchExpressions":[{"key":"ingress-type","operator":"NotIn","values":["tenant]}]}}}'
 echo "...moving default Router"
 oc patch ingresscontroller/default -n  openshift-ingress-operator  --type=merge -p '{"spec":{"nodePlacement": {"nodeSelector": {"matchLabels": {"node-role.kubernetes.io/infra": ""}},"tolerations": [{"effect":"NoSchedule","key": "infra","value": "reserved"},{"effect":"NoExecute","key": "infra","value": "reserved"}]}}}'
 # scale up to 3 replicas
