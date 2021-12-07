@@ -362,7 +362,10 @@ function patch_ingress_cert() {
         script_output "Certificate already present in ingress controller - skipping. Use FORCE=true environment variable to override"
         INGRESS_PATCHED=false
     else
-        ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-ingress --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
+        SECRET_EXISTS=$(${oc_cmd} get secret "${1}" -n openshift-ingress -o jsonpath='{.metadata.name}' 2>/dev/null | wc -w)
+        if [[ ${SECRET_EXISTS} -eq 0 ]]; then
+          ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-ingress --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
+        fi
         ${oc_cmd} patch ingresscontroller.operator default --type=merge --patch='{"spec":{"defaultCertificate":{"name":"'"${1}"'"}}}' -n openshift-ingress-operator
         INGRESS_PATCHED=true
     fi
@@ -390,7 +393,10 @@ function patch_api_cert() {
         script_output "Certificate already present in API Server - skipping. Use FORCE=true environment variable to override"
         API_PATCHED=false
     else
-        ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-config  --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
+        SECRET_EXISTS=$(${oc_cmd} get secret "${1}" -n openshift-config -o jsonpath='{.metadata.name}' 2>/dev/null | wc -w)
+        if [[ ${SECRET_EXISTS} -eq 0 ]]; then
+          ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n openshift-config  --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
+        fi
         ${oc_cmd} patch apiserver cluster --type=merge --patch='{"spec":{"servingCerts": {"namedCertificates":[{"names": ["'"${4}"'"],"servingCertificate": {"name": "'"${1}"'"}}]}}}'
         API_PATCHED=true
     fi
@@ -422,7 +428,10 @@ function patch_mcm_ingress_cert() {
             script_output "Certificate already present in MCM ingress controller - skipping. Use FORCE=true environment variable to override"
             MCM_INGRESS_PATCHED=false
         else
-            ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n open-cluster-management --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
+            SECRET_EXISTS=$(${oc_cmd} get secret "${1}" -n open-cluster-management -o jsonpath='{.metadata.name}' 2>/dev/null | wc -w)
+            if [[ ${SECRET_EXISTS} -eq 0 ]]; then
+              ${oc_cmd} create secret tls "${1}" --cert="${2}" --key="${3}" -n open-cluster-management --save-config --dry-run=client -o yaml | ${oc_cmd} apply -f -
+            fi
             ${oc_cmd} patch deployment ${MANAGEMENT_INGRESS} --patch='{"spec":{"template":{"spec":{"volumes": [{"name": "tls-secret", "secret":{"secretName":"'"${1}"'"}}]}}}}' -n open-cluster-management
             MCM_INGRESS_PATCHED=true
         fi
