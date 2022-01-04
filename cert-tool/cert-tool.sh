@@ -553,7 +553,6 @@ function main() {
     # Log in to ARO Cluster
     script_output "Attempting to log in to OCP Cluster"
 
-sleep 10000
     ocp_login "${ARO_API_URL}:6443" "${ARO_USERNAME}" "${ARO_PASSWORD}"
 
 #    script_output "Attempting to log  in to Azure"
