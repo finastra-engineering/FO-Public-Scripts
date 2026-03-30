@@ -84,10 +84,10 @@ else
   exit 1
 fi
 checkStatus "app.kubernetes.io/name=alertmanager" "openshift-monitoring" "2"
-checkStatus "app.kubernetes.io/name=grafana" "openshift-monitoring" "1"
+checkStatus "app.kubernetes.io/name=grafana" "fo-monitoring" "1"
 checkStatus "app.kubernetes.io/name=kube-state-metrics" "openshift-monitoring" "1"
 checkStatus "app.kubernetes.io/name=openshift-state-metrics" "openshift-monitoring" "1"
-checkStatus "app.kubernetes.io/name=prometheus-adapter" "openshift-monitoring" "2" # probably we need to get rid of this
+# checkStatus "app.kubernetes.io/name=prometheus-adapter" "openshift-monitoring" "2" 
 checkStatus "app.kubernetes.io/name=prometheus" "openshift-monitoring" "2"
 echo "...Monitoring stack moved"
 echo "done"
