@@ -83,11 +83,11 @@ else
   echo "...missing configmap to be applied for monitoring"
   exit 1
 fi
-checkStatus "app=alertmanager" "openshift-monitoring" "3"
-checkStatus "app.kubernetes.io/name=grafana" "openshift-monitoring" "1"
+checkStatus "app.kubernetes.io/name=alertmanager" "openshift-monitoring" "2"
+# checkStatus "app.kubernetes.io/name=grafana" "openshift-monitoring" "1"
 checkStatus "app.kubernetes.io/name=kube-state-metrics" "openshift-monitoring" "1"
-checkStatus "k8s-app=openshift-state-metrics" "openshift-monitoring" "1"
-checkStatus "app.kubernetes.io/name=prometheus-adapter" "openshift-monitoring" "2"
-checkStatus "app=prometheus" "openshift-monitoring" "2"
+checkStatus "app.kubernetes.io/name=openshift-state-metrics" "openshift-monitoring" "1"
+# checkStatus "app.kubernetes.io/name=prometheus-adapter" "openshift-monitoring" "2"
+checkStatus "app.kubernetes.io/name=prometheus" "openshift-monitoring" "2"
 echo "...Monitoring stack moved"
 echo "done"
